@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAISADA FURNITURE</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
+body{background:#F9F6F0}
+header{background:#1A1A1A;color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
+header b span{color:#D4A373}
+nav a{color:#fff;margin-left:10px;font-size:13px;text-decoration:none}
+.btn{display:inline-block;background:#D4A373;color:#000;padding:12px 18px;border-radius:30px;font-weight:bold;border:none;cursor:pointer}
+.btn-dark{background:#1A1A1A;color:#fff}
+.btn-green{background:#25D366;color:#fff}
+.hero{padding:30px 16px;text-align:center;background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)),url('https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=1200&q=80') center/cover;color:#fff}
+section{padding:24px 16px;max-width:1100px;margin:auto}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(min-width:700px){.grid{grid-template-columns:repeat(3,1fr)}}
+.card{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.card img{width:100%;height:180px;object-fit:cover}
+.card-body{padding:12px}
+.price{color:#D4A373;font-weight:bold;margin:6px 0}
+input,select,textarea{width:100%;padding:12px;margin:6px 0;border:1px solid #ddd;border-radius:10px}
+#cartDrawer{position:fixed;right:0;top:0;width:90%;max-width:360px;height:100%;background:#fff;z-index:200;padding:18px;display:none;overflow:auto}
+footer{background:#1A1A1A;color:#fff;padding:24px;text-align:center}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:300;padding:16px}
+.modal>div{background:#fff;border-radius:16px;max-width:500px;width:100%;overflow:hidden}
+.modal img{width:100%;height:260px;object-fit:cover}
+.modal-body{padding:16px}
+</style>
+</head>
+<body>
+<header><b>NAISADA <span>FURNITURE</span></b><nav><a href="#shop">Shop</a><a href="#" onclick="openCart()">Cart (<span id="cartCount">0</span>)</a><a href="#admin">Admin</a></nav></header>
+<div class="hero"><h1>Quality, Stylish & Affordable Sofas</h1><p>Roysambu, Githurai, Thika Road, Nairobi</p><a class="btn btn-green" href="https://wa.me/254722123801">WhatsApp Us</a> <a class="btn" href="#shop">View Furniture</a></div>
+<section id="shop"><h2>Shop Our Sofas</h2><p>All prices in KSh.</p><div class="grid" id="productGrid">Loading...</div></section>
+<section id="admin"><h2>Admin Login</h2>
+<div id="loginBox"><input id="adminEmail" placeholder="admin@naisada.com"><input id="adminPass" type="password" placeholder="naisada2026"><button class="btn btn-dark" onclick="login()">Login</button></div>
+<div id="adminPanel" style="display:none">
+<p><b>Products:</b> <span id="totalP">0</span> | <button class="btn" onclick="logout()">Logout</button></p>
+<h3 style="margin:12px 0">Add Product - UPLOAD PHOTO</h3>
+<input id="pName" placeholder="Product Name e.g. Recliner 2-Seater Beige">
+<select id="pCat"><option>L-Shape Sofas</option><option>3+2 Sofa Sets</option><option>3+2+1+1 Sofa Sets</option><option>Butterfly Seats</option><option>Back Permanent Sofas</option><option>Buffalo Sofas</option><option>Recliners</option><option>Armchairs / King Chairs</option><option>Beds</option><option>Other Furniture on Request</option></select>
+<input id="pPrice" type="number" placeholder="Price in KSh">
+<label><b>📸 Choose Photo From Gallery:</b></label>
+<input id="pFile" type="file" accept="image/*">
+<input id="pImg" placeholder="OR paste Image URL (optional)">
+<textarea id="pDesc" placeholder="Description"></textarea>
+<button class="btn btn-green" onclick="saveProduct()">💾 Save Product With Photo</button>
+<button class="btn btn-dark" onclick="resetForm()">Clear</button>
+<h3 style="margin:14px 0">All Products</h3><div id="adminTable"></div>
+</div></section>
+<footer><b>NAISADA FURNITURE</b><p>Roysambu, Githurai, Thika Road, Nairobi | 0722123801</p></footer>
+<div id="cartDrawer"><h3>Your Cart <button style="float:right" onclick="closeCart()">X</button></h3><div id="cartItems"></div><h3 id="cartTotal"></h3><button class="btn btn-green" onclick="checkout()">Order All on WhatsApp</button></div>
+<div class="modal" id="detailModal"><div><img id="dImg"><div class="modal-body"><h2 id="dName"></h2><p id="dPrice"></p><p id="dDesc"></p><button class="btn btn-green" id="dWhats">Order on WhatsApp</button> <button class="btn btn-dark" onclick="document.getElementById('detailModal').style.display='none'">Close</button></div></div></div>
+<script>
+const SUPABASE_URL = "PASTE_YOUR_PROJECT_URL_HERE";
+const SUPABASE_KEY = "PASTE_YOUR_ANON_KEY_HERE";
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let products=[]; let cart=[]; let editId=null;
+async function loadProducts(){
+  let {data} = await supabaseClient.from('products').select('*').order('id',{ascending:false});
+  products = data || [];
+  render();
+}
+function render(){
+  document.getElementById('productGrid').innerHTML = products.map(p=>`<div class="card"><img src="${p.image_url}" onclick="view(${p.id})"><div class="card-body"><h3>${p.name}</h3><p style="font-size:12px;color:#888">${p.category}</p><p class="price">KSh ${p.price.toLocaleString()}</p><button class="btn btn-green" style="padding:8px 12px;font-size:12px" onclick="orderOne(${p.id})">Order on WhatsApp</button> <button class="btn" style="padding:8px 12px;font-size:12px" onclick="view(${p.id})">View</button> <button class="btn btn-dark" style="padding:8px 12px;font-size:12px;margin-top:6px" onclick="addCart(${p.id})">Add to Cart</button></div></div>`).join('') || '<p>No products yet. Login as Admin to add.</p>';
+  document.getElementById('totalP').innerText = products.length;
+  document.getElementById('adminTable').innerHTML = products.map(p=>`<p style="border-bottom:1px solid #eee;padding:8px;display:flex;justify-content:space-between"><span>${p.name} - KSh ${p.price}</span><span><button onclick="editP(${p.id})">Edit</button> <button onclick="delP(${p.id})">Delete</button></span></p>`).join('');
+}
+function view(id){let p=products.find(x=>x.id===id);document.getElementById('dImg').src=p.image_url;document.getElementById('dName').innerText=p.name;document.getElementById('dPrice').innerText='KSh '+p.price.toLocaleString();document.getElementById('dDesc').innerText=p.description;document.getElementById('dWhats').onclick=()=>orderOne(id);document.getElementById('detailModal').style.display='flex'}
+function orderOne(id){let p=products.find(x=>x.id===id);window.open(`https://wa.me/254722123801?text=${encodeURIComponent(`Hi Naisada, I want to order ${p.name} - KSh ${p.price}`)}`,'_blank')}
+function addCart(id){let p=products.find(x=>x.id===id);cart.push(p);document.getElementById('cartCount').innerText=cart.length;alert('Added: '+p.name)}
+function openCart(){document.getElementById('cartDrawer').style.display='block';let total=cart.reduce((s,p)=>s+p.price,0);document.getElementById('cartItems').innerHTML=cart.map(p=>`<p>${p.name} - KSh ${p.price.toLocaleString()}</p>`).join('')||'Cart empty';document.getElementById('cartTotal').innerText='Total: KSh '+total.toLocaleString()}
+function closeCart(){document.getElementById('cartDrawer').style.display='none'}
+function checkout(){if(!cart.length)return alert('Cart empty');let msg='Hi Naisada, I want to order:\n'+cart.map(p=>`- ${p.name} - KSh ${p.price}`).join('\n');window.open('https://wa.me/254722123801?text='+encodeURIComponent(msg),'_blank')}
+function login(){if(document.getElementById('adminEmail').value==='admin@naisada.com'&&document.getElementById('adminPass').value==='naisada2026'){document.getElementById('loginBox').style.display='none';document.getElementById('adminPanel').style.display='block';alert('Welcome Admin')}else alert('Wrong login')}
+function logout(){document.getElementById('loginBox').style.display='block';document.getElementById('adminPanel').style.display='none'}
+async function saveProduct(){
+  let name=document.getElementById('pName').value, cat=document.getElementById('pCat').value, price=parseInt(document.getElementById('pPrice').value), desc=document.getElementById('pDesc').value, imgUrl=document.getElementById('pImg').value;
+  let file=document.getElementById('pFile').files[0];
+  if(!name||!price) return alert('Add name and price');
+  if(file){
+    let fileName = Date.now() + '-' + file.name;
+    let {error} = await supabaseClient.storage.from('naisada-photos').upload(fileName, file);
+    if(error) return alert('Upload failed: '+error.message);
+    let {data} = supabaseClient.storage.from('naisada-photos').getPublicUrl(fileName);
+    imgUrl = data.publicUrl;
+  }
+  if(!imgUrl) imgUrl='https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&q=80';
+  if(editId){ await supabaseClient.from('products').update({name,category:cat,price,description:desc,image_url:imgUrl}).eq('id',editId); editId=null; } else { await supabaseClient.from('products').insert([{name,category:cat,price,description:desc,image_url:imgUrl}]); }
+  alert('Saved! Photo uploaded to Database.');
+  resetForm(); loadProducts();
+}
+async function delP(id){if(confirm('Delete?')){await supabaseClient.from('products').delete().eq('id',id); loadProducts();}}
+function editP(id){let p=products.find(x=>x.id===id);editId=id;document.getElementById('pName').value=p.name;document.getElementById('pCat').value=p.category;document.getElementById('pPrice').value=p.price;document.getElementById('pImg').value=p.image_url;document.getElementById('pDesc').value=p.description;window.scrollTo(0,document.getElementById('admin').offsetTop)}
+function resetForm(){editId=null;['pName','pPrice','pImg','pDesc'].forEach(i=>document.getElementById(i).value='');document.getElementById('pFile').value=''}
+loadProducts();
+</script>
+</body>
+</html>
